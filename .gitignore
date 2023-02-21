@@ -2,3 +2,4 @@ title.txt
 secret.txt
 Pipfile
 Pipfile.lock
+*.xlsx
