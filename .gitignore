@@ -3,3 +3,4 @@ secret.txt
 Pipfile
 Pipfile.lock
 *.xlsx
+save/
