@@ -4,3 +4,6 @@ Pipfile
 Pipfile.lock
 *.xlsx
 save/
+dist/
+main.spec
+build/
