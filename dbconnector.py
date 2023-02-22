@@ -1,19 +1,25 @@
-from pymongo import MongoClient
+from pymongo import MongoClient, InsertOne, DeleteOne, UpdateOne
 import glob, os
 import pickle
 import openpyxl
 from pprint import pprint
 from typing import Union, List, Dict
 
+from PySide6.QtCore import QObject, Signal, Slot
 
-class ExcelParser:
+
+class ExcelParser(QObject):
     """
     ExcelParser does
     1. Make local save data that can be directly used to upload on DB server (it will be saved in pickle format)
     2. Compare current file status and synchronize it with the local save data
     3. Parse Excel files into compatible data format that can be used in MongoDB
     """
+    # needs to be connected to MongoUpdater's update
+    savefileUpdated = Signal(dict)
+
     def __init__(self):
+        super().__init__()
         self.savefile = {} # {filename : {"id" : str, "flag" : 0, 1, 2, 3 "data" : {str : str}}}, where flag 0 keep, 1 create, 2 update, 3 delete
         self.data = {} # {filename : {str : str}}
         self.dirpath = "./save"
@@ -80,15 +86,27 @@ class ExcelParser:
         self.read_savefile()
         self.synchronize()
         self.write_savefile()
-        return self.savefile
+        # needs to be connected to MongoUpdater's update
+        self.savefileUpdated.emit(self.savefile)
 
     def after_upload(self, updated_data):
+        print("received updated data, write savefile")
         self.savefile = updated_data
         self.write_savefile()
+        print("savefile saved")
 
-class MongoUpdater:
+
+class MongoUpdater(QObject):
+    """
+    MongoUpdater does
+    1. update MongoDB by referring to the data of excel parser
+    2. and send result to ExcelParser
+    """
+    # needs to be connected to ExcelParser's after upload
+    dbUploaded = Signal(dict)
 
     def __init__(self):
+        super().__init__()
         with open("secret.txt", "r") as f:
             URI = f.readline()
             print(URI)
@@ -99,6 +117,8 @@ class MongoUpdater:
         print(self.db)
 
     def update(self, update_data : Dict[str, Union[str, int, Dict[str, str]]]):
+        print("processing update")
+        operations = []
         delfiles = []
         for filename in update_data:
             flag = update_data[filename]["flag"]
@@ -106,27 +126,32 @@ class MongoUpdater:
             if flag == 0:
                 continue
             elif flag == 1:
-                result = self.db.diseases.insert_one(update_data[filename]['data'])
-                print(result)
-                update_data[filename]['id'] = result.inserted_id
+                operations.append(InsertOne(update_data[filename]['data']))
                 update_data[filename]['flag'] = 0
             elif flag == 2:
-                result = self.db.diseases.update_one({'_id': update_data[filename]['id']}, {'$set': update_data[filename]['data']})
-                print(result)
+                operations.append(UpdateOne({'_id': update_data[filename]['_id']}, {'$set': update_data[filename]['data']}))
                 update_data[filename]['flag'] = 0
             elif flag == 3:
-                result = self.db.diseases.delete_one({'_id': update_data[filename]['id']})
+                operations.append(DeleteOne({'_id': update_data[filename]['_id']}))
                 delfiles.append(filename)
-                print(result)
-        
-        for filename in delfiles:
-            del update_data[filename]
-        return update_data
+
+        result = self.db.diseases.bulk_write(operations)
+        success = not result.bulk_api_result['writeErrors']
+
+        if success:
+            for filename in delfiles:
+                del update_data[filename]
+            print("update done, move to EP for savefile write")
+            self.dbUploaded.emit(update_data)
 
 
 
 if __name__ == "__main__":
-    md = MongoUpdater()
     ep = ExcelParser()
-    ud = md.update(ep.export_savefile())
-    ep.after_upload(ud)
+    md = MongoUpdater()
+    
+    ep.savefileUpdated.connect(md.update)
+    md.dbUploaded.connect(ep.after_upload)
+
+    ep.export_savefile()
+    pprint(ep.savefile)
