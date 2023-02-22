@@ -1,6 +1,6 @@
 import os
 import time
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, Signal
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 

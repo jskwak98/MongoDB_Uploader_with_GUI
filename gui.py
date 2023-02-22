@@ -5,7 +5,8 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
-from updater import FileObserver
+from observer import FileObserver
+from dbconnector import 
 
 class SaveGUI(QtWidgets.QWidget):
     def __init__(self):
@@ -112,7 +113,7 @@ class SaveGUI(QtWidgets.QWidget):
             print("Stop Saving")
             self.worker.stop()
             self.thread.quit()
-            self.thread.wait(3000)
+            self.thread.wait(2500)
             self.turned_on = False
         else:
             return
