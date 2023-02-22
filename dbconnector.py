@@ -43,7 +43,7 @@ class ExcelParser(QObject):
             filedex = excel_path.split('\\')[-1]
             if filedex not in self.data and '$' not in filedex:
                 docu = self.read(excel_path)
-                print(filedex)
+                #print(filedex)
                 self.data[filedex] = docu
 
     def read(self, excel_path):
@@ -101,18 +101,18 @@ class ExcelParser(QObject):
         self.savefileUpdated.emit(self.savefile)
 
     def after_upload(self, updated_data):
-        print("received updated data, write savefile")
+        #print("received updated data, write savefile")
         self.savefile = updated_data
         self.write_savefile()
         self.changeTime.emit()
-        print("savefile saved")
+        #print("savefile saved")
     
     # Slots for auto save
     def handlefileDeleted(self, src):
         # file deleted
         src = src.split('\\')[-1]
         if src.endswith(".xlsx"):
-            print(f"Deleted {src}")
+            #print(f"Deleted {src}")
             self.savefile[src]["flag"] = 3
             self.savefileUpdated.emit(self.savefile)
             
@@ -121,7 +121,7 @@ class ExcelParser(QObject):
         src = src.split('\\')[-1]
         dest = dest.split('\\')[-1]
         if src.endswith(".xlsx") and dest.endswith(".xlsx") and src != dest:
-            print(f"filename changed {src} to {dest}")
+            #print(f"filename changed {src} to {dest}")
             self.savefile[dest] = self.savefile[src]
             del self.savefile[src]
             self.write_savefile()
@@ -129,7 +129,7 @@ class ExcelParser(QObject):
     def handlefileCreated(self, src):
         # file created
         if src.endswith(".xlsx"):
-            print(f"Created {src}")
+            #print(f"Created {src}")
             docu = self.read(src)
 
             src = src.split('\\')[-1]
@@ -140,7 +140,7 @@ class ExcelParser(QObject):
     def handlefileModified(self, src):
         # file modified
         if src.endswith(".xlsx"):
-            print(f"modified {src}")
+            #print(f"modified {src}")
             docu = self.read(src)
 
             src = src.split('\\')[-1]
@@ -200,7 +200,7 @@ class MongoUpdater(QObject):
             if success:
                 for filename in delfiles:
                     del update_data[filename]
-                print("update done, move to EP for savefile write")
+                #print("update done, move to EP for savefile write")
                 self.dbUploaded.emit(update_data)
 
 
