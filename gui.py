@@ -6,7 +6,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
 from observer import FileObserver
-from dbconnector import 
+from dbconnector import ExcelParser, MongoUpdater
 
 class SaveGUI(QtWidgets.QWidget):
     def __init__(self):
@@ -18,7 +18,7 @@ class SaveGUI(QtWidgets.QWidget):
 
         self.turned_on = False
 
-        self.init_thread()
+        self.init_threads()
         self.init_auto_save()
         self.init_manual_save()
 
@@ -26,18 +26,31 @@ class SaveGUI(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.addWidget(self.autoframe)
         self.layout.addWidget(self.manualframe)
-        
-    def init_thread(self):
-        self.thread = QThread()
-        self.worker = FileObserver()
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.run)
-        self.thread.finished.connect(self.thread.deleteLater)
-        
-        self.worker.fileDeleted.connect(self.handlefileDeleted)
-        self.worker.fileMoved.connect(self.handlefileMoved)
-        self.worker.fileCreated.connect(self.handlefileCreated)
-        self.worker.fileModified.connect(self.handlefileModified)
+
+    def init_threads(self):
+        self.monitor_thread = QThread()
+        self.observer = FileObserver()
+        self.observer.moveToThread(self.monitor_thread)
+        self.monitor_thread.started.connect(self.observer.run)
+        #self.monitor_thread.finished.connect(self.monitor_thread.deleteLater)
+
+        self.db_thread = QThread()
+        self.parser = ExcelParser()
+        # only updater use db_thread, use updater with the main thread
+
+        self.updater = MongoUpdater()
+        self.updater.moveToThread(self.db_thread)
+        self.parser.savefileUpdated.connect(self.updater.update)
+        self.updater.dbUploaded.connect(self.parser.after_upload)
+        self.parser.changeTime.connect(self.settime)
+
+        #later change it into parser's slots
+        self.observer.fileDeleted.connect(self.parser.handlefileDeleted)
+        self.observer.fileMoved.connect(self.parser.handlefileMoved)
+        self.observer.fileCreated.connect(self.parser.handlefileCreated)
+        self.observer.fileModified.connect(self.parser.handlefileModified)
+
+        self.db_thread.start()
 
     def init_auto_save(self):
         # 자동저장 frame 만들기
@@ -96,13 +109,23 @@ class SaveGUI(QtWidgets.QWidget):
 
         self.manualsave.clicked.connect(self.manual_save)
 
+    def closeEvent(self, event):
+        self.db_thread.quit()
+        self.db_thread.wait(1500)
+        if self.turned_on:
+            self.observer.stop()
+            self.monitor_thread.quit()
+            self.monitor_thread.wait(1500)
+        event.accept()
+
     @QtCore.Slot()
     def save_start(self):
         if self.turned_on:
             return
         else:
             self.dot.setStyleSheet("Color : green")
-            self.thread.start()
+            self.save()
+            self.monitor_thread.start()
             print("Start Saving")
             self.turned_on = True
 
@@ -111,9 +134,9 @@ class SaveGUI(QtWidgets.QWidget):
         if self.turned_on:
             self.dot.setStyleSheet("Color : red")
             print("Stop Saving")
-            self.worker.stop()
-            self.thread.quit()
-            self.thread.wait(2500)
+            self.observer.stop()
+            self.monitor_thread.quit()
+            self.monitor_thread.wait(2500)
             self.turned_on = False
         else:
             return
@@ -124,29 +147,12 @@ class SaveGUI(QtWidgets.QWidget):
             QMessageBox.warning(self, '수동저장 불가', '자동저장 기능을 사용중에는 수동저장이 불가합니다.')
         else:
             self.save()
-
-    @QtCore.Slot(str)
-    def handlefileDeleted(self, src):
-        print("Deleted")
-        print(src)
     
-    @QtCore.Slot(str, str)
-    def handlefileMoved(self, src, dest):
-        print("moved")
-        print(src, dest)
-    
-    @QtCore.Slot(str)
-    def handlefileCreated(self, src):
-        print("created")
-        print(src)
-
-    @QtCore.Slot(str)
-    def handlefileModified(self, src):
-        print("modified")
-        print(src)
-
-    
+    @QtCore.Slot()
     def save(self):
-        print("Saved")
+        self.parser.export_savefile()
+    
+    @QtCore.Slot()
+    def settime(self):
         now = time.strftime('%y-%m-%d %H:%M:%S')
         self.last_time.setText(now)

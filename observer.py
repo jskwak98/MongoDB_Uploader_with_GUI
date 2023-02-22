@@ -46,13 +46,17 @@ class Handler(FileSystemEventHandler):
         self.mod = parent.fileModified
 
     def on_moved(self, event):
-        self.m.emit(event.src_path, event.dest_path)
+        if '$' not in event.src_path and '$' not in event.dest_path:
+            self.m.emit(event.src_path, event.dest_path)
 
     def on_created(self, event):
-        self.c.emit(event.src_path)
+        if '$' not in event.src_path:
+            self.c.emit(event.src_path)
 
     def on_deleted(self, event):
-        self.d.emit(event.src_path)
+        if '$' not in event.src_path:
+            self.d.emit(event.src_path)
 
     def on_modified(self, event):
-        self.mod.emit(event.src_path)
+        if '$' not in event.src_path:
+            self.mod.emit(event.src_path)
