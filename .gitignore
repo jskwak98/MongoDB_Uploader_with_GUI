@@ -7,3 +7,4 @@ save/
 dist/
 main.spec
 build/
+*.exe

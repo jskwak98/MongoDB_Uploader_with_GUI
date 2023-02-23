@@ -43,20 +43,24 @@ class ExcelParser(QObject):
             filedex = excel_path.split('\\')[-1]
             if filedex not in self.data and '$' not in filedex:
                 docu = self.read(excel_path)
-                #print(filedex)
-                self.data[filedex] = docu
+                if docu:
+                    self.data[filedex] = docu
 
     def read(self, excel_path):
-        excel_document = openpyxl.load_workbook(excel_path)
-        sheet = excel_document['Sheet1']
-        docu = dict()
-        docu["disease_name"] = sheet['A2'].value
-        docu["category"] = sheet['D2'].value
-        docu["definition"] = sheet['C2'].value
-        docu["cause_symptom"] = sheet['C3'].value
-        docu["care"] = sheet['C4'].value
+        try:
+            excel_document = openpyxl.load_workbook(excel_path)
+            sheet = excel_document['Sheet1']
+            if sheet.max_row == 4 and sheet.max_col == 4:
+                docu = dict()
+                docu["disease_name"] = sheet['A2'].value
+                docu["category"] = sheet['D2'].value
+                docu["definition"] = sheet['C2'].value
+                docu["cause_symptom"] = sheet['C3'].value
+                docu["care"] = sheet['C4'].value
+            return docu
 
-        return docu
+        except:
+            return
 
     def make_savefile(self):
         # make self.savefile and save it as pickle file
@@ -131,27 +135,27 @@ class ExcelParser(QObject):
         if src.endswith(".xlsx"):
             #print(f"Created {src}")
             docu = self.read(src)
+            if docu:
+                src = src.split('\\')[-1]
 
-            src = src.split('\\')[-1]
-
-            self.savefile[src] = {"flag" : 1, "data" : docu}
-            self.savefileUpdated.emit(self.savefile)
+                self.savefile[src] = {"flag" : 1, "data" : docu}
+                self.savefileUpdated.emit(self.savefile)
 
     def handlefileModified(self, src):
         # file modified
         if src.endswith(".xlsx"):
             #print(f"modified {src}")
             docu = self.read(src)
-
-            src = src.split('\\')[-1]
-            isupdate = False
-            for item in docu:
-                if docu[item] != self.savefile[src]["data"][item]:
-                    self.savefile[src]["flag"] = 2 # update
-                    self.savefile[src]["data"][item] = docu[item]
-                    isupdate = True
-            if isupdate:
-                self.savefileUpdated.emit(self.savefile)
+            if docu:
+                src = src.split('\\')[-1]
+                isupdate = False
+                for item in docu:
+                    if docu[item] != self.savefile[src]["data"][item]:
+                        self.savefile[src]["flag"] = 2 # update
+                        self.savefile[src]["data"][item] = docu[item]
+                        isupdate = True
+                if isupdate:
+                    self.savefileUpdated.emit(self.savefile)
 
 
 class MongoUpdater(QObject):
