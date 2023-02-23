@@ -175,7 +175,7 @@ class MongoUpdater(QObject):
         self.client = MongoClient(URI)
         try:
             self.client.admin.command('ismaster')
-            self.db = self.client.sample_illcyclopedia
+            self.db = self.client.illcyclopedia
         except ConnectionFailure:
             print("Server Not Available")
 
