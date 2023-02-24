@@ -126,14 +126,14 @@ class SaveGUI(QtWidgets.QWidget):
             self.dot.setStyleSheet("Color : green")
             self.save()
             self.monitor_thread.start()
-            print("Start Saving")
+            #print("Start Saving")
             self.turned_on = True
 
     @QtCore.Slot()
     def save_stop(self):
         if self.turned_on:
             self.dot.setStyleSheet("Color : red")
-            print("Stop Saving")
+            #print("Stop Saving")
             self.observer.stop()
             self.monitor_thread.quit()
             self.monitor_thread.wait(2500)

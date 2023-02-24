@@ -43,20 +43,24 @@ class ExcelParser(QObject):
             filedex = excel_path.split('\\')[-1]
             if filedex not in self.data and '$' not in filedex:
                 docu = self.read(excel_path)
-                print(filedex)
-                self.data[filedex] = docu
+                if docu:
+                    self.data[filedex] = docu
 
     def read(self, excel_path):
-        excel_document = openpyxl.load_workbook(excel_path)
-        sheet = excel_document['Sheet1']
-        docu = dict()
-        docu["disease_name"] = sheet['A2'].value
-        docu["category"] = sheet['D2'].value
-        docu["definition"] = sheet['C2'].value
-        docu["cause_symptom"] = sheet['C3'].value
-        docu["care"] = sheet['C4'].value
+        try:
+            excel_document = openpyxl.load_workbook(excel_path)
+            sheet = excel_document['Sheet1']
+            if sheet.max_row == 4 and sheet.max_col == 4:
+                docu = dict()
+                docu["disease_name"] = sheet['A2'].value
+                docu["category"] = sheet['D2'].value
+                docu["definition"] = sheet['C2'].value
+                docu["cause_symptom"] = sheet['C3'].value
+                docu["care"] = sheet['C4'].value
+            return docu
 
-        return docu
+        except:
+            return
 
     def make_savefile(self):
         # make self.savefile and save it as pickle file
@@ -101,18 +105,18 @@ class ExcelParser(QObject):
         self.savefileUpdated.emit(self.savefile)
 
     def after_upload(self, updated_data):
-        print("received updated data, write savefile")
+        #print("received updated data, write savefile")
         self.savefile = updated_data
         self.write_savefile()
         self.changeTime.emit()
-        print("savefile saved")
+        #print("savefile saved")
     
     # Slots for auto save
     def handlefileDeleted(self, src):
         # file deleted
         src = src.split('\\')[-1]
         if src.endswith(".xlsx"):
-            print(f"Deleted {src}")
+            #print(f"Deleted {src}")
             self.savefile[src]["flag"] = 3
             self.savefileUpdated.emit(self.savefile)
             
@@ -121,7 +125,7 @@ class ExcelParser(QObject):
         src = src.split('\\')[-1]
         dest = dest.split('\\')[-1]
         if src.endswith(".xlsx") and dest.endswith(".xlsx") and src != dest:
-            print(f"filename changed {src} to {dest}")
+            #print(f"filename changed {src} to {dest}")
             self.savefile[dest] = self.savefile[src]
             del self.savefile[src]
             self.write_savefile()
@@ -129,29 +133,29 @@ class ExcelParser(QObject):
     def handlefileCreated(self, src):
         # file created
         if src.endswith(".xlsx"):
-            print(f"Created {src}")
+            #print(f"Created {src}")
             docu = self.read(src)
+            if docu:
+                src = src.split('\\')[-1]
 
-            src = src.split('\\')[-1]
-
-            self.savefile[src] = {"flag" : 1, "data" : docu}
-            self.savefileUpdated.emit(self.savefile)
+                self.savefile[src] = {"flag" : 1, "data" : docu}
+                self.savefileUpdated.emit(self.savefile)
 
     def handlefileModified(self, src):
         # file modified
         if src.endswith(".xlsx"):
-            print(f"modified {src}")
+            #print(f"modified {src}")
             docu = self.read(src)
-
-            src = src.split('\\')[-1]
-            isupdate = False
-            for item in docu:
-                if docu[item] != self.savefile[src]["data"][item]:
-                    self.savefile[src]["flag"] = 2 # update
-                    self.savefile[src]["data"][item] = docu[item]
-                    isupdate = True
-            if isupdate:
-                self.savefileUpdated.emit(self.savefile)
+            if docu:
+                src = src.split('\\')[-1]
+                isupdate = False
+                for item in docu:
+                    if docu[item] != self.savefile[src]["data"][item]:
+                        self.savefile[src]["flag"] = 2 # update
+                        self.savefile[src]["data"][item] = docu[item]
+                        isupdate = True
+                if isupdate:
+                    self.savefileUpdated.emit(self.savefile)
 
 
 class MongoUpdater(QObject):
@@ -171,7 +175,7 @@ class MongoUpdater(QObject):
         self.client = MongoClient(URI)
         try:
             self.client.admin.command('ismaster')
-            self.db = self.client.sample_illcyclopedia
+            self.db = self.client.illcyclopedia
         except ConnectionFailure:
             print("Server Not Available")
 
@@ -200,7 +204,7 @@ class MongoUpdater(QObject):
             if success:
                 for filename in delfiles:
                     del update_data[filename]
-                print("update done, move to EP for savefile write")
+                #print("update done, move to EP for savefile write")
                 self.dbUploaded.emit(update_data)
 
 
