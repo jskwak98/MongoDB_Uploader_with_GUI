@@ -166,6 +166,7 @@ class MongoUpdater(QObject):
     """
     # needs to be connected to ExcelParser's after upload
     dbUploaded = Signal(dict)
+    searchResults = Signal(dict)
 
     def __init__(self):
         super().__init__()
@@ -178,6 +179,9 @@ class MongoUpdater(QObject):
             self.db = self.client.illcyclopedia
         except ConnectionFailure:
             print("Server Not Available")
+
+    def search(self, searchQuery):
+        pass
 
     def update(self, update_data : Dict[str, Union[str, int, Dict[str, str]]]):
         operations = []

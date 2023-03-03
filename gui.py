@@ -9,6 +9,9 @@ from observer import FileObserver
 from dbconnector import ExcelParser, MongoUpdater
 
 class SaveGUI(QtWidgets.QWidget):
+
+    searchQuery = Signal(str)
+
     def __init__(self):
         super().__init__()
         with open("title.txt", "r", encoding = 'UTF-8') as f:
@@ -21,11 +24,21 @@ class SaveGUI(QtWidgets.QWidget):
         self.init_threads()
         self.init_auto_save()
         self.init_manual_save()
+        self.init_search_frame()
 
         # 전체 Frame 만들기
-        self.layout = QtWidgets.QVBoxLayout(self)
-        self.layout.addWidget(self.autoframe)
-        self.layout.addWidget(self.manualframe)
+        self.layout = QtWidgets.QHBoxLayout(self)
+        leftside = QWidget()
+        leftview = QVBoxLayout()
+        leftview.addWidget(self.autoframe)
+        leftview.addWidget(self.manualframe)
+        leftside.setLayout(leftview)
+
+        
+
+        self.layout.addWidget(leftside)
+        leftside.resize(380, 380)
+        self.layout.addWidget(self.searchframe)
 
     def init_threads(self):
         self.monitor_thread = QThread()
@@ -36,19 +49,25 @@ class SaveGUI(QtWidgets.QWidget):
 
         self.db_thread = QThread()
         self.parser = ExcelParser()
-        # only updater use db_thread, use updater with the main thread
 
+        # only updater use db_thread, use updater with the main thread
         self.updater = MongoUpdater()
         self.updater.moveToThread(self.db_thread)
         self.parser.savefileUpdated.connect(self.updater.update)
         self.updater.dbUploaded.connect(self.parser.after_upload)
         self.parser.changeTime.connect(self.settime)
 
-        #later change it into parser's slots
+        # later change it into parser's slots
         self.observer.fileDeleted.connect(self.parser.handlefileDeleted)
         self.observer.fileMoved.connect(self.parser.handlefileMoved)
         self.observer.fileCreated.connect(self.parser.handlefileCreated)
         self.observer.fileModified.connect(self.parser.handlefileModified)
+
+        # for search connect searchQuery signal with updater
+        self.searchQuery.connect(self.updater.search)
+
+        # to update table with search result from updater
+        self.updater.searchResults.connect(self.update_table)
 
         self.db_thread.start()
 
@@ -84,6 +103,40 @@ class SaveGUI(QtWidgets.QWidget):
 
         self.autosave.clicked.connect(self.save_start)
         self.autosave_stop.clicked.connect(self.save_stop)
+
+    def init_search_frame(self):
+        # Search 용 frame 만들기
+        self.searchframe = QGroupBox("DB 검색 및 수정")
+
+        searchs = QWidget()
+        searchview = QVBoxLayout()
+
+        # search lineinput
+        sbview = QHBoxLayout()
+
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText('병명 입력')
+        self.search_btn = QPushButton("검색")
+        self.search_btn.clicked.connect(self.search)
+
+        sbview.addWidget(self.search_box)
+        sbview.addWidget(self.search_btn)
+        searchs.setLayout(sbview)
+
+        # search table
+        self.search_table = QTableWidget()
+        self.search_table.setColumnCount(5)
+
+        table_column = ["병명", "파일명", "마지막 수정일자", "다운로드", "삭제"]
+        self.search_table.setHorizontalHeaderLabels(table_column)
+
+        # add all widgets
+        searchview.addWidget(searchs)
+        searchview.addWidget(self.search_table)
+
+        self.searchframe.setLayout(searchview)
+
+
     
     def init_manual_save(self):
         # 수동저장 frame 만들기
@@ -117,6 +170,19 @@ class SaveGUI(QtWidgets.QWidget):
             self.monitor_thread.quit()
             self.monitor_thread.wait(1500)
         event.accept()
+
+    def search(self):
+        self.searchQuery.emit(self.search_box.text())
+
+    def update_table(self, results):
+        pass
+
+
+    def readDB(self):
+        # based on the last read time from DB, get updated elements which will not be in your local db
+        # TODO
+        pass
+
 
     @QtCore.Slot()
     def save_start(self):
