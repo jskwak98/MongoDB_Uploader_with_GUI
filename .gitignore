@@ -12,3 +12,5 @@ build/
 *.ico
 datas/
 __pycache__
+save_ver1
+save_reader.py

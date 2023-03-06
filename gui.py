@@ -7,7 +7,7 @@ from PySide6.QtGui import *
 
 from observer import FileObserver
 from mongoDBupdater import MongoUpdater
-from excelparser import ExcelParser
+from localDBmanager import LocalDBManager
 
 class SaveGUI(QtWidgets.QWidget):
 
@@ -49,20 +49,20 @@ class SaveGUI(QtWidgets.QWidget):
         #self.monitor_thread.finished.connect(self.monitor_thread.deleteLater)
 
         self.db_thread = QThread()
-        self.parser = ExcelParser()
+        self.manager = LocalDBManager()
 
         # only updater use db_thread, use updater with the main thread
         self.updater = MongoUpdater()
         self.updater.moveToThread(self.db_thread)
-        self.parser.savefileUpdated.connect(self.updater.update)
-        self.updater.dbUploaded.connect(self.parser.after_upload)
-        self.parser.changeTime.connect(self.settime)
+        self.manager.savefileUpdated.connect(self.updater.update)
+        self.updater.dbUploaded.connect(self.manager.after_upload)
+        self.manager.changeTime.connect(self.settime)
 
-        # later change it into parser's slots
-        self.observer.fileDeleted.connect(self.parser.handlefileDeleted)
-        self.observer.fileMoved.connect(self.parser.handlefileMoved)
-        self.observer.fileCreated.connect(self.parser.handlefileCreated)
-        self.observer.fileModified.connect(self.parser.handlefileModified)
+        # later change it into manager's slots
+        self.observer.fileDeleted.connect(self.manager.handlefileDeleted)
+        self.observer.fileMoved.connect(self.manager.handlefileMoved)
+        self.observer.fileCreated.connect(self.manager.handlefileCreated)
+        self.observer.fileModified.connect(self.manager.handlefileModified)
 
         # for search connect searchQuery signal with updater
         self.searchQuery.connect(self.updater.search)
@@ -217,7 +217,7 @@ class SaveGUI(QtWidgets.QWidget):
     
     @QtCore.Slot()
     def save(self):
-        self.parser.export_savefile()
+        self.manager.save_current_state_to_savefile()
     
     @QtCore.Slot()
     def settime(self):

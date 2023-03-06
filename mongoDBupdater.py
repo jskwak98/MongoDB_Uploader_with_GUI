@@ -5,16 +5,16 @@ from typing import Union, List, Dict
 from pymongo.errors import ConnectionFailure
 from PySide6.QtCore import QObject, Signal, Slot
 
-from excelparser import ExcelParser
+from localDBmanager import LocalDBManager
 
 
 class MongoUpdater(QObject):
     """
     MongoUpdater does
-    1. update MongoDB by referring to the data of excel parser
-    2. and send result to ExcelParser
+    1. update MongoDB by referring to the data of localDBManager, Specifically localDBmanager.savefile
+    2. and send result to localDBmanager
     """
-    # needs to be connected to ExcelParser's after upload
+    # needs to be connected to localDBmanager's after upload
     dbUploaded = Signal(dict)
     searchResults = Signal(dict)
 
@@ -64,7 +64,7 @@ class MongoUpdater(QObject):
 
 
 if __name__ == "__main__":
-    ep = ExcelParser()
+    ep = LocalDBManager()
     md = MongoUpdater()
     
     ep.savefileUpdated.connect(md.update)
