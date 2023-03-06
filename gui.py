@@ -6,7 +6,8 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
 from observer import FileObserver
-from dbconnector import ExcelParser, MongoUpdater
+from mongoDBupdater import MongoUpdater
+from excelparser import ExcelParser
 
 class SaveGUI(QtWidgets.QWidget):
 

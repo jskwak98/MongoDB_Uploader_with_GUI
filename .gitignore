@@ -11,3 +11,4 @@ build/
 *.spec
 *.ico
 datas/
+__pycache__
