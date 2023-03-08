@@ -1,4 +1,5 @@
-from pymongo import MongoClient, InsertOne, DeleteOne, UpdateOne
+from pymongo import MongoClient, DeleteOne, UpdateOne
+from newInsertOne import InsertOne
 from pprint import pprint
 from typing import Union, List, Dict
 
@@ -42,9 +43,11 @@ class MongoUpdater(QObject):
             if flag == 0:
                 continue
             elif flag == 1:
+                print("doing it")
                 operations.append(InsertOne(update_data[filename]['data']))
                 update_data[filename]['flag'] = 0
             elif flag == 2:
+                print("doing wrong")
                 operations.append(UpdateOne({'_id': update_data[filename]['data']['_id']}, {'$set': update_data[filename]['data']}))
                 update_data[filename]['flag'] = 0
             elif flag == 3:
@@ -54,6 +57,9 @@ class MongoUpdater(QObject):
         if operations:
             result = self.db.diseases.bulk_write(operations)
             success = not result.bulk_api_result['writeErrors']
+            print(operations[:10])
+            print(result)
+            
 
             if success:
                 for filename in delfiles:

@@ -5,6 +5,7 @@ from pprint import pprint
 from typing import Union, List, Dict
 
 from PySide6.QtCore import QObject, Signal, Slot
+from bson.objectid import ObjectId
 
 
 class LocalDBManager(QObject):
@@ -55,6 +56,7 @@ class LocalDBManager(QObject):
                 docu["definition"] = sheet['C2'].value
                 docu["cause_symptom"] = sheet['C3'].value
                 docu["care"] = sheet['C4'].value
+                docu["_id"] = str(ObjectId()) # add ID at read side to make it string
             return docu
 
         except:
@@ -85,6 +87,8 @@ class LocalDBManager(QObject):
                 self.savefile[filename]["is_deleted"] = False
                 self.savefile[filename]["local_path"] = self.filename_to_filepath[filename]
                 for item in self.data[filename]:
+                    if item == "_id":
+                        continue
                     if self.data[filename][item] != self.savefile[filename]["data"][item]:
                         self.savefile[filename]["flag"] = 2 # update
                         self.savefile[filename]["data"][item] = self.data[filename][item] # change data into currently read one
