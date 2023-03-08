@@ -47,8 +47,8 @@ class LocalDBManager(QObject):
     def read(self, excel_path):
         try:
             excel_document = openpyxl.load_workbook(excel_path)
-            sheet = excel_document['Sheet1']
-            if sheet['A1'].value == '질병명' and sheet['B1'].value == '주제' and sheet['C1'].value == '내용' and sheet['D1'].value == '컨텐츠속성': 
+            sheet = excel_document.worksheets[0]
+            if sheet['A1'].value == '질병명' and sheet['B1'].value == '주제' and sheet['D1'].value == '컨텐츠속성': # and sheet['C1'].value == '내용': 몇 개의 파일은 이게 안적힘.
                 docu = dict()
                 docu["disease_name"] = sheet['A2'].value
                 docu["category"] = sheet['D2'].value
@@ -58,6 +58,7 @@ class LocalDBManager(QObject):
             return docu
 
         except:
+            print(f"error occurred at {excel_path}")
             return
 
     def init_savefile(self):
