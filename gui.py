@@ -126,11 +126,16 @@ class SaveGUI(QtWidgets.QWidget):
 
         # search table
         self.search_table = QTableWidget()
-        self.search_table.setColumnCount(5)
+        self.search_table.setColumnCount(4)
 
-        table_column = ["병명", "파일명", "마지막 수정일자", "다운로드", "삭제"]
+        table_column = ["병명", "파일명", "다운로드", "삭제"]
         self.search_table.setHorizontalHeaderLabels(table_column)
 
+        header = self.search_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         # add all widgets
         searchview.addWidget(searchs)
         searchview.addWidget(self.search_table)
@@ -176,7 +181,61 @@ class SaveGUI(QtWidgets.QWidget):
         self.searchQuery.emit(self.search_box.text())
 
     def update_table(self, results):
-        pass
+        if not results:
+            QMessageBox.warning(self, '검색결과 없음', f'"{self.search_box.text()}"에 대한 검색결과가 존재하지 않습니다.')
+        else:
+            self.temp_search = results
+            # reset table
+            while self.search_table.rowCount() > 0 :
+                self.search_table.removeRow(0)
+            # add result
+            for result in self.temp_search:
+                row = self.search_table.rowCount()
+                self.search_table.insertRow(row)
+                self.search_table.setItem(row, 0, QTableWidgetItem(result['disease_name']))
+                self.search_table.setItem(row, 1, QTableWidgetItem(result['category']))
+                
+                # buttons
+                dld_btn = QPushButton("다운로드")
+                del_btn = QPushButton("삭제")
+
+                del_btn.clicked.connect(self.table_del)
+                dld_btn.clicked.connect(self.table_dld)
+
+                self.search_table.setCellWidget(row, 2, dld_btn)
+                self.search_table.setCellWidget(row, 3, del_btn)
+
+    def table_del(self):
+        button = self.sender()
+
+        item = self.search_table.indexAt(button.pos())
+        data = self.temp_search[item.row()]
+        disease = data['disease_name']
+        qm = QMessageBox
+        reply = qm.question(self, 'DB에서 삭제', f'"{disease}"를 온라인 DB에서 삭제합니다.\n이는 복구가 불가능 합니다.\n진행하시겠습니까?', qm.Yes | qm.No)
+
+        ## TODO -> 실제 삭제와 연결, 그리고 Table Reset하기?
+        if reply == qm.Yes:
+            qm.information(self, '', '삭제하였습니다.')
+        else:
+            qm.information(self, '', '삭제하지 않았습니다.')
+        
+
+    def table_dld(self):
+        button = self.sender()
+
+        item = self.search_table.indexAt(button.pos())
+        data = self.temp_search[item.row()]
+        ## TODO -> 덮어쓰기와 새로쓰기 구분, 
+        """
+        if data exists:
+            덮어쓰시겠습니까?
+        if data doesn't exist:
+            다운로드 받겠습니까?
+            엑셀writer로 써주기.
+        """
+
+
 
 
     def readDB(self):

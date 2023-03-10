@@ -1,4 +1,4 @@
-from pymongo import MongoClient, DeleteOne, UpdateOne
+from pymongo import MongoClient, DeleteOne, UpdateOne, TEXT
 from newInsertOne import InsertOne
 from pprint import pprint
 from typing import Union, List, Dict
@@ -17,7 +17,7 @@ class MongoUpdater(QObject):
     """
     # needs to be connected to localDBmanager's after upload
     dbUploaded = Signal(dict)
-    searchResults = Signal(dict)
+    searchResults = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -28,11 +28,15 @@ class MongoUpdater(QObject):
         try:
             self.client.admin.command('ismaster')
             self.db = self.client.illcyclopedia
+            if 'disease_name' not in self.db.diseases.index_information():
+                self.db.diseases.create_index(name="disease_name", keys=[('disease_name', TEXT)])
         except ConnectionFailure:
             print("Server Not Available")
 
     def search(self, searchQuery):
-        pass
+        results = list(self.db.diseases.find({"$text": {"$search": searchQuery}}).limit(10))
+        self.searchResults.emit(results)
+        # list of dictionary emitted
 
     def update(self, update_data : Dict[str, Union[str, int, Dict[str, str]]]):
         operations = []
