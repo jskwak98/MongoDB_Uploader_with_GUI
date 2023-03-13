@@ -44,6 +44,8 @@ class LocalDBManager(QObject):
                 if docu:
                     self.data[filedex] = docu
                     self.filename_to_filepath[filedex] = excel_path
+            elif filedex in self.data and excel_path != self.data[filedex]['local_path']:
+                self.data[filedex]['local_path'] = excel_path
 
     def read(self, excel_path):
         try:
@@ -56,6 +58,7 @@ class LocalDBManager(QObject):
                 docu["definition"] = sheet['C2'].value
                 docu["cause_symptom"] = sheet['C3'].value
                 docu["care"] = sheet['C4'].value
+                docu["filename"] = excel_path.split('\\')[-1]
                 docu["_id"] = str(ObjectId()) # add ID at read side to make it string
             return docu
 
@@ -136,15 +139,25 @@ class LocalDBManager(QObject):
             self.write_savefile()
             
     def handlefileMoved(self, src_path, dest_path):
-        # file moved, only deals with the filename changes
+        # file moved and source path changes handling
         src = src_path.split('\\')[-1]
         dest = dest_path.split('\\')[-1]
-        if src.endswith(".xlsx") and dest.endswith(".xlsx") and src != dest:
-            #print(f"filename changed {src} to {dest}")
-            self.savefile[dest] = self.savefile[src]
-            self.savefile[dest]["local_path"] = dest_path
-            del self.savefile[src]
+        if src.endswith(".xlsx") and dest.endswith(".xlsx"):
+            # To deal with the move operation, updates local path information
+            self.savefile[src]["local_path"] = dest_path
+            self.filename_to_filepath[dest] = dest_path
+            isupdate = False
+            # If file name is changed, then deal
+            if src != dest:
+                #print(f"filename changed {src} to {dest}")
+                self.savefile[dest] = self.savefile[src]
+                self.savefile[dest]['data']['filename'] = dest
+                del self.savefile[src]
+                del self.filename_to_filepath[src]
+                isupdate = True
             self.write_savefile()
+            if isupdate:
+                self.savefileUpdated.emit(self.savefile)
     
     def handlefileCreated(self, src_path):
         # file created

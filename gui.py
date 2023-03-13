@@ -8,10 +8,12 @@ from PySide6.QtGui import *
 from observer import FileObserver
 from mongoDBupdater import MongoUpdater
 from localDBmanager import LocalDBManager
+from write_excel import write_excel
 
 class SaveGUI(QtWidgets.QWidget):
 
     searchQuery = Signal(str)
+    delDocID = Signal(str, str)
 
     def __init__(self):
         super().__init__()
@@ -69,6 +71,10 @@ class SaveGUI(QtWidgets.QWidget):
 
         # to update table with search result from updater
         self.updater.searchResults.connect(self.update_table)
+
+        # deletion of DB needs to be connected
+        self.delDocID.connect(self.updater.delete)
+        self.updater.delete_success.connect(self.after_delete)
 
         self.db_thread.start()
 
@@ -182,6 +188,9 @@ class SaveGUI(QtWidgets.QWidget):
 
     def update_table(self, results):
         if not results:
+            # reset table
+            while self.search_table.rowCount() > 0 :
+                self.search_table.removeRow(0)
             QMessageBox.warning(self, '검색결과 없음', f'"{self.search_box.text()}"에 대한 검색결과가 존재하지 않습니다.')
         else:
             self.temp_search = results
@@ -206,42 +215,78 @@ class SaveGUI(QtWidgets.QWidget):
                 self.search_table.setCellWidget(row, 3, del_btn)
 
     def table_del(self):
-        button = self.sender()
-
-        item = self.search_table.indexAt(button.pos())
-        data = self.temp_search[item.row()]
-        disease = data['disease_name']
-        qm = QMessageBox
-        reply = qm.question(self, 'DB에서 삭제', f'"{disease}"를 온라인 DB에서 삭제합니다.\n이는 복구가 불가능 합니다.\n진행하시겠습니까?', qm.Yes | qm.No)
-
-        ## TODO -> 실제 삭제와 연결, 그리고 Table Reset하기?
-        if reply == qm.Yes:
-            qm.information(self, '', '삭제하였습니다.')
+        if self.turned_on:
+            QMessageBox.warning(self, '삭제작업 불가', '자동저장 기능을 사용하는 중에는 DB 삭제가 불가합니다.')
         else:
-            qm.information(self, '', '삭제하지 않았습니다.')
+            button = self.sender()
+
+            item = self.search_table.indexAt(button.pos())
+            data = self.temp_search[item.row()]
+            disease = data['disease_name']
+            qm = QMessageBox
+            reply = qm.question(self, 'DB에서 삭제', f'"{disease}"를 온라인 DB에서 삭제합니다.\n이는 복구가 불가능 합니다.\n진행하시겠습니까?', qm.Yes | qm.No)
+
+            ## TODO -> 실제 삭제와 연결, 그리고 Table Reset하기?
+            ## 그냥 Search 한번 더 하면 그만임. 그러면 알아서 update 된다.
+            if reply == qm.Yes:
+                self.delDocID.emit(data['_id'], data['filename'])
+            else:
+                qm.information(self, '', '삭제하지 않았습니다.')
+    
+    def after_delete(self, success, filename):
+        qm = QMessageBox
+        if success:
+            if self.manager.savefile[filename]:
+                del self.manager.savefile[filename]
+                self.manager.write_savefile()
+            qm.information(self, '삭제완료', "삭제되었습니다.")
+            # 재검색 및 테이블 재로딩
+            self.search()
+        else:
+            qm.information(self, '삭제실패', "삭제되지않았습니다.")
         
 
     def table_dld(self):
-        button = self.sender()
+        if self.turned_on:
+            QMessageBox.warning(self, '다운로드 불가', '자동저장 기능을 사용하는 중에는 다운로드가 불가합니다.')
+        else:
+            button = self.sender()
 
-        item = self.search_table.indexAt(button.pos())
-        data = self.temp_search[item.row()]
-        ## TODO -> 덮어쓰기와 새로쓰기 구분, 
-        """
-        if data exists:
-            덮어쓰시겠습니까?
-        if data doesn't exist:
-            다운로드 받겠습니까?
-            엑셀writer로 써주기.
-        """
+            item = self.search_table.indexAt(button.pos())
+            data = self.temp_search[item.row()]
+            
+            filename = data['filename']
+            disease = data['disease_name']
+            # overwrite
+            if filename in self.manager.savefile and not self.manager.savefile[filename]["is_deleted"]:
+                lp = self.manager.savefile[filename]["local_path"]
+                qm = QMessageBox
+                reply = qm.question(self, '덮어쓰기', f'"{disease}"의 데이터가 {lp}에 존재합니다.\n온라인 DB의 데이터로 덮어쓰시겠습니까?', qm.Yes | qm.No)
+                if reply == qm.Yes:
+                    if write_excel(data, lp):
+                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": "./"+filename, "data" : data}
+                        self.manager.write_savefile()
+                        qm.information(self, '덮어쓰기 완료', f'{lp}에 {disease}의 데이터를 성공적으로 덮어썼습니다.')
+                    else:
+                        qm.information(self, '덮어쓰기 실패', f'덮어쓰기 실패, 다운로드를 재시도하거나,\n수동저장 후 재시도 해주세요.')
+                else:
+                    qm.information(self, '', '덮어쓰지 않습니다.')
+            # New Download
+            else:
+                qm = QMessageBox
+                reply = qm.question(self, '다운로드', f'"{disease}"의 데이터를 다운로드 하시겠습니까?', qm.Yes | qm.No)
+                if reply == qm.Yes:
+                    if write_excel(data):
+                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": "./"+filename, "data" : data}
+                        self.manager.write_savefile()
+                        qm.information(self, '다운로드 완료', f'{filename}으로 {disease}의 데이터를 다운로드 했습니다.')
+                    else:
+                        qm.information(self, '다운로드 실패', f'다운로드를 실패했습니다.')
+                else:
+                    qm.information(self, '', '다운로드하지 않습니다.')
+            
+        
 
-
-
-
-    def readDB(self):
-        # based on the last read time from DB, get updated elements which will not be in your local db
-        # TODO
-        pass
 
 
     @QtCore.Slot()

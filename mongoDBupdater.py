@@ -18,6 +18,7 @@ class MongoUpdater(QObject):
     # needs to be connected to localDBmanager's after upload
     dbUploaded = Signal(dict)
     searchResults = Signal(list)
+    delete_success = Signal(bool, str)
 
     def __init__(self):
         super().__init__()
@@ -25,33 +26,50 @@ class MongoUpdater(QObject):
             URI = f.readline()
 
         self.client = MongoClient(URI)
+        self.create_index_later = False
         try:
             self.client.admin.command('ismaster')
-            self.db = self.client.illcyclopedia
-            if 'disease_name' not in self.db.diseases.index_information():
-                self.db.diseases.create_index(name="disease_name", keys=[('disease_name', TEXT)])
+            # illcyclopedia for actual, _dev for dev
+            #self.db = self.client.illcyclopedia
+            self.db = self.client.illcyclopedia_dev
+            # if collection diseases does not exist
+            if "diseases" in self.db.list_collection_names():
+                # if diseases collections exist, but it doesn't have search index
+                if 'disease_name' not in self.db.diseases.index_information():
+                    self.db.diseases.create_index(name="disease_name", keys=[('disease_name', TEXT)])
+            else:
+                self.create_index_later = True
         except ConnectionFailure:
             print("Server Not Available")
 
     def search(self, searchQuery):
         results = list(self.db.diseases.find({"$text": {"$search": searchQuery}}).limit(10))
-        self.searchResults.emit(results)
         # list of dictionary emitted
+        self.searchResults.emit(results)
+
+    def delete(self, docu_id, filename):
+        result = self.db.diseases.delete_one({'_id':docu_id})
+        if result.deleted_count:
+            self.delete_success.emit(True, filename)
+        else:
+            self.delete_success.emit(False, filename)
+        
 
     def update(self, update_data : Dict[str, Union[str, int, Dict[str, str]]]):
         operations = []
         delfiles = []
         for filename in update_data:
+            # deleted file is not considered
+            if update_data[filename]["is_deleted"]:
+                continue
             flag = update_data[filename]["flag"]
             # Operation Depending on Flag, 0 : NOP, 1 : Create, 2 : Update, 3 : Delete
             if flag == 0:
                 continue
             elif flag == 1:
-                print("doing it")
                 operations.append(InsertOne(update_data[filename]['data']))
                 update_data[filename]['flag'] = 0
             elif flag == 2:
-                print("doing wrong")
                 operations.append(UpdateOne({'_id': update_data[filename]['data']['_id']}, {'$set': update_data[filename]['data']}))
                 update_data[filename]['flag'] = 0
             elif flag == 3:
@@ -66,6 +84,9 @@ class MongoUpdater(QObject):
             
 
             if success:
+                if self.create_index_later:
+                    # if it's initial upload to ODB and search index not created yet
+                    self.db.diseases.create_index(name="disease_name", keys=[('disease_name', TEXT)])
                 for filename in delfiles:
                     del update_data[filename]
                 #print("update done, move to EP for savefile write")
