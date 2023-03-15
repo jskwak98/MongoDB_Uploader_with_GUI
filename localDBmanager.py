@@ -126,6 +126,12 @@ class LocalDBManager(QObject):
         self.changeTime.emit()
         #print("savefile saved")
     
+    def check_deleted_recreated(self, filename):
+        for excel_path in glob.iglob("**\\" + filename, recursive=True):
+            self.savefile[filename]["local_path"] = excel_path
+            return True
+        return False
+    
     # Slots for auto save
     def handlefileDeleted(self, src_path):
         # file deleted
@@ -157,7 +163,9 @@ class LocalDBManager(QObject):
                 isupdate = True
             self.write_savefile()
             if isupdate:
+                # updates needed when you changed filename
                 self.savefileUpdated.emit(self.savefile)
+            
     
     def handlefileCreated(self, src_path):
         # file created

@@ -258,13 +258,13 @@ class SaveGUI(QtWidgets.QWidget):
             filename = data['filename']
             disease = data['disease_name']
             # overwrite
-            if filename in self.manager.savefile and not self.manager.savefile[filename]["is_deleted"]:
+            if filename in self.manager.savefile and self.manager.check_deleted_recreated(filename):
                 lp = self.manager.savefile[filename]["local_path"]
                 qm = QMessageBox
                 reply = qm.question(self, '덮어쓰기', f'"{disease}"의 데이터가 {lp}에 존재합니다.\n온라인 DB의 데이터로 덮어쓰시겠습니까?', qm.Yes | qm.No)
                 if reply == qm.Yes:
                     if write_excel(data, lp):
-                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": "./"+filename, "data" : data}
+                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": lp, "data" : data}
                         self.manager.write_savefile()
                         qm.information(self, '덮어쓰기 완료', f'{lp}에 {disease}의 데이터를 성공적으로 덮어썼습니다.')
                     else:
