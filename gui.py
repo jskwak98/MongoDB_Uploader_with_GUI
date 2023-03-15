@@ -60,6 +60,10 @@ class SaveGUI(QtWidgets.QWidget):
         self.updater.dbUploaded.connect(self.manager.after_upload)
         self.manager.changeTime.connect(self.settime)
 
+        # initialize with db data
+        self.manager.giveDBdata.connect(self.updater.new_client_init_data)
+        self.updater.hereDBdata.connect(self.manager.init_savefile)
+
         # later change it into manager's slots
         self.observer.fileDeleted.connect(self.manager.handlefileDeleted)
         self.observer.fileMoved.connect(self.manager.handlefileMoved)
@@ -77,6 +81,7 @@ class SaveGUI(QtWidgets.QWidget):
         self.updater.delete_success.connect(self.after_delete)
 
         self.db_thread.start()
+        self.manager.init_with_DB()
 
     def init_auto_save(self):
         # 자동저장 frame 만들기

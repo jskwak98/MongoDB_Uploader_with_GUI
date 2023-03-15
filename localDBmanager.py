@@ -18,6 +18,7 @@ class LocalDBManager(QObject):
     # needs to be connected to MongoUpdater's update
     savefileUpdated = Signal(dict)
     changeTime = Signal()
+    giveDBdata = Signal()
 
     def __init__(self):
         super().__init__()
@@ -27,11 +28,12 @@ class LocalDBManager(QObject):
         self.dirpath = "./save"
         self.datapath = "./save/savefile"
 
+    def init_with_DB(self):
         if not os.path.exists(self.dirpath):
             os.makedirs("save")
 
         if not os.path.exists(self.datapath):
-            self.init_savefile()
+            self.giveDBdata.emit()
 
     def read_and_parse(self):
         # read and parse excel files into usable data and save it into self.data
@@ -66,11 +68,17 @@ class LocalDBManager(QObject):
             print(f"error occurred at {excel_path}")
             return
 
-    def init_savefile(self):
+    def init_savefile(self, dbdata):
+        for data in dbdata:
+            self.savefile[data['filename']] = {"flag" : 0, "is_deleted" : True, "local_path": "./"+data['filename'], "data" : data}
         # make self.savefile and save it as pickle file
         self.read_and_parse()
         for filename in self.data:
-            self.savefile[filename] = {"flag" : 1, "is_deleted" : False, "local_path": self.filename_to_filepath[filename], "data" : self.data[filename]}
+            if filename in self.savefile:
+                self.savefile[filename]["is_deleted"] = False
+                self.savefile[filename]["local_path"] = self.filename_to_filepath[filename]
+            else:
+                self.savefile[filename] = {"flag" : 1, "is_deleted" : False, "local_path": self.filename_to_filepath[filename], "data" : self.data[filename]}
         self.write_savefile()
 
     def read_savefile(self):

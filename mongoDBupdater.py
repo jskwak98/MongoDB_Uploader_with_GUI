@@ -19,6 +19,7 @@ class MongoUpdater(QObject):
     dbUploaded = Signal(dict)
     searchResults = Signal(list)
     delete_success = Signal(bool, str)
+    hereDBdata = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -41,6 +42,10 @@ class MongoUpdater(QObject):
                 self.create_index_later = True
         except ConnectionFailure:
             print("Server Not Available")
+
+    def new_client_init_data(self):
+        dbdata = list(self.db.diseases.find({}))
+        self.hereDBdata.emit(dbdata)
 
     def search(self, searchQuery):
         results = list(self.db.diseases.find({"$text": {"$search": searchQuery}}).limit(10))
