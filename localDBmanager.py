@@ -37,8 +37,6 @@ class LocalDBManager(QObject):
 
     def read_and_parse(self):
         # read and parse excel files into usable data and save it into self.data
-        self.data = {}
-
         for excel_path in glob.iglob('**\*.xlsx', recursive=True):
             filedex = excel_path.split('\\')[-1]
             if filedex not in self.data and '$' not in filedex:
@@ -46,8 +44,8 @@ class LocalDBManager(QObject):
                 if docu:
                     self.data[filedex] = docu
                     self.filename_to_filepath[filedex] = excel_path
-            elif filedex in self.data and excel_path != self.data[filedex]['local_path']:
-                self.data[filedex]['local_path'] = excel_path
+            elif filedex in self.data and excel_path != self.filename_to_filepath[filedex]:
+                self.filename_to_filepath[filedex] = excel_path
 
     def read(self, excel_path):
         try:
