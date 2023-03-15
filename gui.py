@@ -135,6 +135,7 @@ class SaveGUI(QtWidgets.QWidget):
         self.search_box.setPlaceholderText('병명 입력')
         self.search_btn = QPushButton("검색")
         self.search_btn.clicked.connect(self.search)
+        self.search_box.returnPressed.connect(self.search)
 
         sbview.addWidget(self.search_box)
         sbview.addWidget(self.search_btn)
