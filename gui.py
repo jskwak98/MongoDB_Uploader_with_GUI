@@ -50,8 +50,11 @@ class SaveGUI(QtWidgets.QWidget):
         self.monitor_thread.started.connect(self.observer.run)
         #self.monitor_thread.finished.connect(self.monitor_thread.deleteLater)
 
+        # use manager thread since it takes long time
         self.db_thread = QThread()
+        self.manager_thread = QThread()
         self.manager = LocalDBManager()
+        self.manager.moveToThread(self.manager_thread)
 
         # only updater use db_thread, use updater with the main thread
         self.updater = MongoUpdater()
@@ -80,6 +83,8 @@ class SaveGUI(QtWidgets.QWidget):
         self.delDocID.connect(self.updater.delete)
         self.updater.delete_success.connect(self.after_delete)
 
+        # manager thread start
+        self.manager_thread.start()
         self.db_thread.start()
         self.manager.init_with_DB()
 
@@ -180,6 +185,8 @@ class SaveGUI(QtWidgets.QWidget):
         self.manualsave.clicked.connect(self.manual_save)
 
     def closeEvent(self, event):
+        self.manager_thread.quit()
+        self.manager_thread.wait(1500)
         self.db_thread.quit()
         self.db_thread.wait(1500)
         if self.turned_on:
