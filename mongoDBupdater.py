@@ -48,7 +48,6 @@ class MongoUpdater(QObject):
         self.hereDBdata.emit(dbdata)
 
     def search(self, searchQuery, strong):
-        print(searchQuery, strong)
         if not strong:
             results = list(self.db.diseases.find({"$text": {"$search": searchQuery}}).limit(10))
             # list of dictionary emitted
