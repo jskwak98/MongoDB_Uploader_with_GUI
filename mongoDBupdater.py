@@ -47,19 +47,14 @@ class MongoUpdater(QObject):
         dbdata = list(self.db.diseases.find({}))
         self.hereDBdata.emit(dbdata)
 
-    def search(self, searchQuery, strong):
-        if not strong:
-            results = list(self.db.diseases.find({"$text": {"$search": searchQuery}}).limit(10))
-            # list of dictionary emitted
-            self.searchResults.emit(results)
-        else:
-            results = list(self.db.diseases.find({}))
-            detail = []
-            for result in results:
-                if searchQuery in result['disease_name'] or searchQuery in result['definition']:
-                    detail.append(result)
-            # list of dictionary containing the keyword emitted
-            self.searchResults.emit(detail)
+    def search(self, searchQuery):
+        results = list(self.db.diseases.find({}))
+        detail = []
+        for result in results:
+            if searchQuery in result['disease_name'] or searchQuery in result['definition']:
+                detail.append(result)
+        # list of dictionary containing the keyword emitted
+        self.searchResults.emit(detail)
             
         
         

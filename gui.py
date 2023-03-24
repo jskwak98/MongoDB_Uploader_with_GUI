@@ -12,7 +12,7 @@ from write_excel import write_excel
 
 class SaveGUI(QtWidgets.QWidget):
 
-    searchQuery = Signal(str, bool)
+    searchQuery = Signal(str)
     delDocID = Signal(str, str)
 
     def __init__(self):
@@ -136,11 +136,9 @@ class SaveGUI(QtWidgets.QWidget):
         self.search_btn = QPushButton("검색")
         self.search_btn.clicked.connect(self.search)
         self.search_box.returnPressed.connect(self.search)
-        self.strong_search = QCheckBox('상세검색')
 
         sbview.addWidget(self.search_box)
         sbview.addWidget(self.search_btn)
-        sbview.addWidget(self.strong_search)
         searchs.setLayout(sbview)
         
 
@@ -200,7 +198,7 @@ class SaveGUI(QtWidgets.QWidget):
         event.accept()
 
     def search(self):
-        self.searchQuery.emit(self.search_box.text(), self.strong_search.isChecked())
+        self.searchQuery.emit(self.search_box.text())
 
     def update_table(self, results):
         if not results:
@@ -343,3 +341,4 @@ class SaveGUI(QtWidgets.QWidget):
     def settime(self):
         now = time.strftime('%y-%m-%d %H:%M:%S')
         self.last_time.setText(now)
+        # TODO update하고나면 여기까지 타고들어와서 어떤 문서들이 업데이트 되었는지 알림 보여주자.
