@@ -1,9 +1,8 @@
 import sys
 from gui import SaveGUI
-from PySide6 import QtWidgets
+from PySide6.QtWidgets import QApplication
 
-
-app = QtWidgets.QApplication([])
+app = QApplication([])
 
 gui = SaveGUI()
 gui.resize(700, 400)

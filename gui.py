@@ -9,6 +9,8 @@ from observer import FileObserver
 from mongoDBupdater import MongoUpdater
 from localDBmanager import LocalDBManager
 from write_excel import write_excel
+from detailWindow import LookWindow
+from logWindow import LogWindow
 
 class SaveGUI(QtWidgets.QWidget):
 
@@ -23,6 +25,7 @@ class SaveGUI(QtWidgets.QWidget):
         self.setWindowTitle(title)
 
         self.turned_on = False
+        self.look = None
 
         self.init_threads()
         self.init_auto_save()
@@ -61,6 +64,7 @@ class SaveGUI(QtWidgets.QWidget):
         self.updater.moveToThread(self.db_thread)
         self.manager.savefileUpdated.connect(self.updater.update)
         self.updater.dbUploaded.connect(self.manager.after_upload)
+        self.updater.nothingToUpload.connect(self.no_upload)
         self.manager.changeTime.connect(self.settime)
 
         # initialize with db data
@@ -144,23 +148,19 @@ class SaveGUI(QtWidgets.QWidget):
 
         # search table
         self.search_table = QTableWidget()
-        self.search_table.setColumnCount(4)
+        self.search_table.setColumnCount(2)
 
-        table_column = ["병명", "파일명", "다운로드", "삭제"]
+        table_column = ["병명", "상세보기"]
         self.search_table.setHorizontalHeaderLabels(table_column)
 
         header = self.search_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         # add all widgets
         searchview.addWidget(searchs)
         searchview.addWidget(self.search_table)
 
         self.searchframe.setLayout(searchview)
-
-
     
     def init_manual_save(self):
         # 수동저장 frame 만들기
@@ -198,7 +198,8 @@ class SaveGUI(QtWidgets.QWidget):
         event.accept()
 
     def search(self):
-        self.searchQuery.emit(self.search_box.text())
+        if self.search_box.text():
+            self.searchQuery.emit(self.search_box.text())
 
     def update_table(self, results):
         if not results:
@@ -216,36 +217,25 @@ class SaveGUI(QtWidgets.QWidget):
                 row = self.search_table.rowCount()
                 self.search_table.insertRow(row)
                 self.search_table.setItem(row, 0, QTableWidgetItem(result['disease_name']))
-                self.search_table.setItem(row, 1, QTableWidgetItem(result['category']))
                 
-                # buttons
-                dld_btn = QPushButton("다운로드")
-                del_btn = QPushButton("삭제")
+                # button
+                look_btn = QPushButton("상세보기")
+                look_btn.clicked.connect(self.table_look)
+                self.search_table.setCellWidget(row, 1, look_btn)
+    
+    def table_look(self):
+        button = self.sender()
 
-                del_btn.clicked.connect(self.table_del)
-                dld_btn.clicked.connect(self.table_dld)
-
-                self.search_table.setCellWidget(row, 2, dld_btn)
-                self.search_table.setCellWidget(row, 3, del_btn)
-
-    def table_del(self):
-        if self.turned_on:
-            QMessageBox.warning(self, '삭제작업 불가', '자동저장 기능을 사용하는 중에는 DB 삭제가 불가합니다.')
-        else:
-            button = self.sender()
-
-            item = self.search_table.indexAt(button.pos())
-            data = self.temp_search[item.row()]
-            disease = data['disease_name']
-            qm = QMessageBox
-            reply = qm.question(self, 'DB에서 삭제', f'"{disease}"를 온라인 DB에서 삭제합니다.\n이는 복구가 불가능 합니다.\n진행하시겠습니까?', qm.Yes | qm.No)
-
-            ## TODO -> 실제 삭제와 연결, 그리고 Table Reset하기?
-            ## 그냥 Search 한번 더 하면 그만임. 그러면 알아서 update 된다.
-            if reply == qm.Yes:
-                self.delDocID.emit(data['_id'], data['filename'])
-            else:
-                qm.information(self, '', '삭제하지 않았습니다.')
+        item = self.search_table.indexAt(button.pos())
+        data = self.temp_search[item.row()]
+        
+        if self.look is None:
+            self.look = LookWindow(data, self)
+            self.look.delDocID.connect(self.updater.delete)
+            self.look.searchAgain.connect(self.search)
+            self.updater.delete_success.connect(self.look.after_delete)
+            self.look.updateDB.connect(self.manager.emit_save)
+            self.look.show()
     
     def after_delete(self, success, filename):
         qm = QMessageBox
@@ -257,50 +247,10 @@ class SaveGUI(QtWidgets.QWidget):
             # 재검색 및 테이블 재로딩
             self.search()
         else:
-            qm.information(self, '삭제실패', "삭제되지않았습니다.")
+            qm.information(self, '삭제실패', "삭제되지않았습니다.")        
         
-
-    def table_dld(self):
-        if self.turned_on:
-            QMessageBox.warning(self, '다운로드 불가', '자동저장 기능을 사용하는 중에는 다운로드가 불가합니다.')
-        else:
-            button = self.sender()
-
-            item = self.search_table.indexAt(button.pos())
-            data = self.temp_search[item.row()]
-            
-            filename = data['filename']
-            disease = data['disease_name']
-            # overwrite
-            if filename in self.manager.savefile and self.manager.check_deleted_recreated(filename):
-                lp = self.manager.savefile[filename]["local_path"]
-                qm = QMessageBox
-                reply = qm.question(self, '덮어쓰기', f'"{disease}"의 데이터가 {lp}에 존재합니다.\n온라인 DB의 데이터로 덮어쓰시겠습니까?', qm.Yes | qm.No)
-                if reply == qm.Yes:
-                    if write_excel(data, lp):
-                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": lp, "data" : data}
-                        self.manager.write_savefile()
-                        qm.information(self, '덮어쓰기 완료', f'{lp}에 {disease}의 데이터를 성공적으로 덮어썼습니다.')
-                    else:
-                        qm.information(self, '덮어쓰기 실패', f'덮어쓰기 실패, 다운로드를 재시도하거나,\n수동저장 후 재시도 해주세요.')
-                else:
-                    qm.information(self, '', '덮어쓰지 않습니다.')
-            # New Download
-            else:
-                qm = QMessageBox
-                reply = qm.question(self, '다운로드', f'"{disease}"의 데이터를 다운로드 하시겠습니까?', qm.Yes | qm.No)
-                if reply == qm.Yes:
-                    if write_excel(data):
-                        self.manager.savefile[filename] = {"flag" : 0, "is_deleted" : False, "local_path": "./"+filename, "data" : data}
-                        self.manager.write_savefile()
-                        qm.information(self, '다운로드 완료', f'{filename}으로 {disease}의 데이터를 다운로드 했습니다.')
-                    else:
-                        qm.information(self, '다운로드 실패', f'다운로드를 실패했습니다.')
-                else:
-                    qm.information(self, '', '다운로드하지 않습니다.')
-            
-        
-
+    def no_upload(self):
+        QMessageBox.information(self, '업로드할 파일 없음', f'업로드할 파일이 없습니다.\n모든 상태가 최신입니다.')
 
 
     @QtCore.Slot()
@@ -338,7 +288,10 @@ class SaveGUI(QtWidgets.QWidget):
         self.manager.save_current_state_to_savefile()
     
     @QtCore.Slot()
-    def settime(self):
+    def settime(self, added, modified):
         now = time.strftime('%y-%m-%d %H:%M:%S')
         self.last_time.setText(now)
-        # TODO update하고나면 여기까지 타고들어와서 어떤 문서들이 업데이트 되었는지 알림 보여주자.
+        self.log = LogWindow(added, modified)
+        self.log.searchAgain.connect(self.search)
+        self.log.show()
+        self.log.raise_()

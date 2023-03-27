@@ -16,10 +16,11 @@ class MongoUpdater(QObject):
     2. and send result to localDBmanager
     """
     # needs to be connected to localDBmanager's after upload
-    dbUploaded = Signal(dict)
+    dbUploaded = Signal(dict, list, list)
     searchResults = Signal(list)
     delete_success = Signal(bool, str)
     hereDBdata = Signal(list)
+    nothingToUpload = Signal()
 
     def __init__(self):
         super().__init__()
@@ -50,14 +51,19 @@ class MongoUpdater(QObject):
     def search(self, searchQuery):
         results = list(self.db.diseases.find({}))
         detail = []
+        debug = set()
         for result in results:
-            if searchQuery in result['disease_name'] or searchQuery in result['definition']:
+            debug.add(result['category'])
+            if result['category'] == '유방내분비질환':
+                print('유방내분비질환 오타 : ' + result['disease_name'].replace('\n', ' '))
+            elif result['category'] == '김염성 질환':
+                print('김염성 질환 오타 : ' + result['disease_name'].replace('\n', ' '))
+            if searchQuery in result['disease_name']:
                 detail.append(result)
+        print(debug)
+        print(len(debug))
         # list of dictionary containing the keyword emitted
         self.searchResults.emit(detail)
-            
-        
-        
 
     def delete(self, docu_id, filename):
         result = self.db.diseases.delete_one({'_id':docu_id})
@@ -69,11 +75,10 @@ class MongoUpdater(QObject):
 
     def update(self, update_data : Dict[str, Union[str, int, Dict[str, str]]]):
         operations = []
+        added = []
+        modified = []
         delfiles = []
         for filename in update_data:
-            # deleted file is not considered
-            if update_data[filename]["is_deleted"]:
-                continue
             flag = update_data[filename]["flag"]
             # Operation Depending on Flag, 0 : NOP, 1 : Create, 2 : Update, 3 : Delete
             if flag == 0:
@@ -81,9 +86,15 @@ class MongoUpdater(QObject):
             elif flag == 1:
                 operations.append(InsertOne(update_data[filename]['data']))
                 update_data[filename]['flag'] = 0
+                added.append((update_data[filename]['data']['disease_name'], update_data[filename]['local_path']))
             elif flag == 2:
                 operations.append(UpdateOne({'_id': update_data[filename]['data']['_id']}, {'$set': update_data[filename]['data']}))
                 update_data[filename]['flag'] = 0
+                if update_data[filename]['is_deleted']:
+                    lp = "로컬에 없음"
+                else:
+                    lp = update_data[filename]['local_path']
+                modified.append((update_data[filename]['data']['disease_name'], lp))
             elif flag == 3:
                 operations.append(DeleteOne({'_id': update_data[filename]['data']['_id']}))
                 delfiles.append(filename)
@@ -102,7 +113,10 @@ class MongoUpdater(QObject):
                 for filename in delfiles:
                     del update_data[filename]
                 #print("update done, move to EP for savefile write")
-                self.dbUploaded.emit(update_data)
+                self.dbUploaded.emit(update_data, added, modified)
+        
+        else:
+            self.nothingToUpload.emit()
 
 
 

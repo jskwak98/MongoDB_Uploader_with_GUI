@@ -17,7 +17,7 @@ class LocalDBManager(QObject):
     """
     # needs to be connected to MongoUpdater's update
     savefileUpdated = Signal(dict)
-    changeTime = Signal()
+    changeTime = Signal(list, list)
     giveDBdata = Signal()
 
     def __init__(self):
@@ -29,11 +29,18 @@ class LocalDBManager(QObject):
         self.datapath = "./save/savefile"
 
     def init_with_DB(self):
+        is_first = False
+
         if not os.path.exists(self.dirpath):
             os.makedirs("save")
 
         if not os.path.exists(self.datapath):
             self.giveDBdata.emit()
+            is_first = True
+        
+        if not is_first:
+            self.read_savefile()
+
 
     def read_and_parse(self):
         # read and parse excel files into usable data and save it into self.data
@@ -125,11 +132,11 @@ class LocalDBManager(QObject):
         # needs to be connected to MongoUpdater's update
         self.savefileUpdated.emit(self.savefile)
 
-    def after_upload(self, updated_data):
+    def after_upload(self, updated_data, added, modified):
         #print("received updated data, write savefile")
         self.savefile = updated_data
         self.write_savefile()
-        self.changeTime.emit()
+        self.changeTime.emit(added, modified)
         #print("savefile saved")
     
     def check_deleted_recreated(self, filename):
@@ -209,3 +216,6 @@ class LocalDBManager(QObject):
                         isupdate = True
                 if isupdate:
                     self.savefileUpdated.emit(self.savefile)
+
+    def emit_save(self):
+        self.savefileUpdated.emit(self.savefile)
