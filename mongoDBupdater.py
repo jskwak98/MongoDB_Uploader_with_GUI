@@ -17,10 +17,11 @@ class MongoUpdater(QObject):
     """
     # needs to be connected to localDBmanager's after upload
     dbUploaded = Signal(dict, list, list)
-    searchResults = Signal(list)
+    searchResults = Signal(list, list, bool)
     delete_success = Signal(bool, str)
     hereDBdata = Signal(list)
     nothingToUpload = Signal()
+    onlineSyncData = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -43,6 +44,10 @@ class MongoUpdater(QObject):
                 self.create_index_later = True
         except ConnectionFailure:
             print("Server Not Available")
+    
+    def get_online_sync_data(self):
+        dbdata = list(self.db.diseases.find({}))
+        self.onlineSyncData.emit(dbdata)
 
     def new_client_init_data(self):
         dbdata = list(self.db.diseases.find({}))
@@ -51,19 +56,27 @@ class MongoUpdater(QObject):
     def search(self, searchQuery):
         results = list(self.db.diseases.find({}))
         detail = []
-        debug = set()
-        for result in results:
-            debug.add(result['category'])
-            if result['category'] == '유방내분비질환':
-                print('유방내분비질환 오타 : ' + result['disease_name'].replace('\n', ' '))
-            elif result['category'] == '김염성 질환':
-                print('김염성 질환 오타 : ' + result['disease_name'].replace('\n', ' '))
-            if searchQuery in result['disease_name']:
-                detail.append(result)
-        print(debug)
-        print(len(debug))
+        debugs = []
+        isbug = False
+
+        if searchQuery: # 정상 검색
+            for result in results:
+                if searchQuery in result['disease_name']:
+                    detail.append(result)
+            
+        else: # 귀찮은 TODO -> 오타검정
+            cates = {'피부/미용/성형 질환', '유전질환', '건강증진', '혈액/종양 질환', '눈/코/귀/인후/구강/치아', 
+                '신장/비뇨기계 질환', '여성질환', '호흡기질환', '기타', '뇌/신경/정신질환', '근골격질환', 
+                '응급질환', '소아/신생아 질환', '소화기계 질환', '순환기(심혈관계)질환', '감염성질환', '유방/내분비질환'}
+            isbug = True
+            for result in results:
+                if result['category'] not in cates:
+                    dn = result['disease_name'].replace('\n', ' ')
+                    debugs.append(f"질병 : {dn}, 분류 오타 : {result['category']}")
+                    detail.append(result)
+            
         # list of dictionary containing the keyword emitted
-        self.searchResults.emit(detail)
+        self.searchResults.emit(detail, debugs, isbug)
 
     def delete(self, docu_id, filename):
         result = self.db.diseases.delete_one({'_id':docu_id})

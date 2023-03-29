@@ -7,6 +7,8 @@ from typing import Union, List, Dict
 from PySide6.QtCore import QObject, Signal, Slot
 from bson.objectid import ObjectId
 
+from write_excel import write_excel
+
 
 class LocalDBManager(QObject):
     """
@@ -19,6 +21,7 @@ class LocalDBManager(QObject):
     savefileUpdated = Signal(dict)
     changeTime = Signal(list, list)
     giveDBdata = Signal()
+    syncOnlineData = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -120,30 +123,58 @@ class LocalDBManager(QObject):
         with open(self.datapath, 'wb') as f:
             pickle.dump(self.savefile, f)
 
+    def get_current_local_status(self):
+        self.data = {}
+        self.read_and_parse()
+        self.read_savefile()
+        self.synchronize()
+
     def save_current_state_to_savefile(self):
         # on demand savefile update
         # when you manual save and start autosaving
         # save current state to savefile
         # and reflect it to the DB
-        self.read_and_parse()
-        self.read_savefile()
-        self.synchronize()
+        self.get_current_local_status()
         self.write_savefile()
         # needs to be connected to MongoUpdater's update
         self.savefileUpdated.emit(self.savefile)
 
+    def check_deleted_recreated(self, filename):
+        for excel_path in glob.iglob("**\\" + filename, recursive=True):
+            self.savefile[filename]["local_path"] = excel_path
+            return True
+        return False
+
+    def get_online_data_to_overwrite(self, online_db):
+        # list that will be emitted as signal after overwriting happens
+        overwritten_files = []
+        # get current local status
+        self.get_current_local_status()
+
+        # iterate through online data and check if there was an update online
+        for data in online_db:
+            fn = data['filename']
+            # update local path and check if it is deleted
+            self.check_deleted_recreated(fn) 
+            if fn in self.savefile:
+                do_write = False
+                for category in self.savefile[fn]['data']:
+                    if self.savefile[fn]['data'][category] != data[category]:
+                        do_write = True
+                        self.savefile[fn]['data'][category] = data[category]
+                # if overwrite happened and your file is in your local
+                if do_write and not self.savefile[fn]['is_deleted']:
+                    write_excel(data, self.savefile[fn]['local_path'])
+                    overwritten_files.append((data['disease_name'].replace('\n', ' '), self.savefile[fn]['local_path']))
+        self.write_savefile()
+        self.syncOnlineData.emit(overwritten_files)
+                    
     def after_upload(self, updated_data, added, modified):
         #print("received updated data, write savefile")
         self.savefile = updated_data
         self.write_savefile()
         self.changeTime.emit(added, modified)
         #print("savefile saved")
-    
-    def check_deleted_recreated(self, filename):
-        for excel_path in glob.iglob("**\\" + filename, recursive=True):
-            self.savefile[filename]["local_path"] = excel_path
-            return True
-        return False
     
     # Slots for auto save
     def handlefileDeleted(self, src_path):

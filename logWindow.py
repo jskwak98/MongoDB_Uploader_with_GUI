@@ -3,6 +3,8 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
+import requests
+
 
 class LogWindow(QWidget):
     searchAgain = Signal()
@@ -18,6 +20,13 @@ class LogWindow(QWidget):
         self.added = QTextEdit()
         self.added.setText(self.parse(added))
         self.added.setReadOnly(True)
+        
+        # request backend to update an image based on the category
+        if added:
+            URL="https://lgd0lbex7b.execute-api.ap-northeast-2.amazonaws.com/default/updateAllData"
+            r = requests.get(url = URL)
+            data = r.json()
+            #print(data)
 
         modified_label = QLabel("DB에 수정된 항목")
         modified_label.setStyleSheet("font-weight: bold")

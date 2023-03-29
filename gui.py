@@ -87,6 +87,10 @@ class SaveGUI(QtWidgets.QWidget):
         self.delDocID.connect(self.updater.delete)
         self.updater.delete_success.connect(self.after_delete)
 
+        # online db synchronization connected
+        self.manager.syncOnlineData.connect(self.after_sync)
+        self.updater.onlineSyncData.connect(self.manager.get_online_data_to_overwrite)
+
         # manager thread start
         self.manager_thread.start()
         self.db_thread.start()
@@ -136,7 +140,7 @@ class SaveGUI(QtWidgets.QWidget):
         sbview = QHBoxLayout()
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('병명 입력')
+        self.search_box.setPlaceholderText('병명 입력, 분류 오타 검정을 위해선 빈칸으로 남겨주세요.')
         self.search_btn = QPushButton("검색")
         self.search_btn.clicked.connect(self.search)
         self.search_box.returnPressed.connect(self.search)
@@ -175,16 +179,20 @@ class SaveGUI(QtWidgets.QWidget):
         self.last_time.setAlignment(QtCore.Qt.AlignCenter)
 
         self.manualsave = QPushButton("수동저장")
+        self.sync_btn = QPushButton("온라인DB 기준으로 동기화")
 
         manualview.addStretch(1)
         manualview.addWidget(guide)
         manualview.addWidget(self.last_time)
         manualview.addStretch(2)
         manualview.addWidget(self.manualsave)
+        manualview.addStretch(2)
+        manualview.addWidget(self.sync_btn)
         manualview.addStretch(1)
         self.manualframe.setLayout(manualview)
 
         self.manualsave.clicked.connect(self.manual_save)
+        self.sync_btn.clicked.connect(self.sync_with_online_modification)
 
     def closeEvent(self, event):
         self.manager_thread.quit()
@@ -198,15 +206,17 @@ class SaveGUI(QtWidgets.QWidget):
         event.accept()
 
     def search(self):
-        if self.search_box.text():
-            self.searchQuery.emit(self.search_box.text())
+        self.searchQuery.emit(self.search_box.text())
 
-    def update_table(self, results):
+    def update_table(self, results, debugs, isbug):
         if not results:
             # reset table
             while self.search_table.rowCount() > 0 :
                 self.search_table.removeRow(0)
-            QMessageBox.warning(self, '검색결과 없음', f'"{self.search_box.text()}"에 대한 검색결과가 존재하지 않습니다.')
+            if not isbug:
+                QMessageBox.warning(self, '검색결과 없음', f'"{self.search_box.text()}"에 대한 검색결과가 존재하지 않습니다.')
+            if isbug:
+                QMessageBox.warning(self, '카테고리 오타 없음', "병 분류 오타가 존재하지 않습니다.")
         else:
             self.temp_search = results
             # reset table
@@ -222,6 +232,9 @@ class SaveGUI(QtWidgets.QWidget):
                 look_btn = QPushButton("상세보기")
                 look_btn.clicked.connect(self.table_look)
                 self.search_table.setCellWidget(row, 1, look_btn)
+            if isbug:
+                bugs = "\n".join(debugs)
+                QMessageBox.warning(self, '카테고리 오타 발견', f"다음 파일들에서 병 분류 오타가 발생했습니다.\n상세보기 창에서 카테고리를 재설정하고 수정 및 동기화 해주세요.\n{bugs}")
     
     def table_look(self):
         button = self.sender()
@@ -251,6 +264,30 @@ class SaveGUI(QtWidgets.QWidget):
         
     def no_upload(self):
         QMessageBox.information(self, '업로드할 파일 없음', f'업로드할 파일이 없습니다.\n모든 상태가 최신입니다.')
+
+    def sync_with_online_modification(self):
+        if self.turned_on:
+            QMessageBox.warning(self, '동기화 불가', '자동저장 기능을 사용중에는 동기화가 불가합니다.')
+        else:
+            qm = QMessageBox
+            reply = qm.question(self, '온라인과 동기화', f'온라인 DB와 컴퓨터의 엑셀 파일을 동기화합니다.\n웹사이트를 통해 수정한 내역들이 모두 엑셀 파일에 덮어써집니다.\n다소 시간이 소요될 수 있습니다.\n진행하시겠습니까?', qm.Yes | qm.No)
+            if reply == qm.Yes:
+                self.updater.get_online_sync_data()
+            else:
+                qm.information(self, '취소', '동기화를 취소합니다.')
+    
+    def after_sync(self, overwritten_files): 
+        if not overwritten_files:
+            qm = QMessageBox
+            qm.information(self, '동기화 완료', "동기화가 완료되었습니다.\n덮어씌워진 파일은 없습니다.")
+        else:
+            info = ""
+            for hist in overwritten_files:
+                dn, path = hist
+                info += f"\n병명 : {dn} || 경로 : {path}"
+            qm = QMessageBox
+            qm.information(self, '동기화 완료', "동기화가 완료되었습니다.\n덮어씌워진 파일은 다음과 같습니다." + info)
+
 
 
     @QtCore.Slot()
