@@ -91,6 +91,9 @@ class SaveGUI(QtWidgets.QWidget):
         self.manager.syncOnlineData.connect(self.after_sync)
         self.updater.onlineSyncData.connect(self.manager.get_online_data_to_overwrite)
 
+        # number of search results
+        self.updater.docCount.connect(self.showDocCount)
+
         # manager thread start
         self.manager_thread.start()
         self.db_thread.start()
@@ -140,7 +143,7 @@ class SaveGUI(QtWidgets.QWidget):
         sbview = QHBoxLayout()
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('병명 입력, 분류 오타 검정을 위해선 빈칸으로 남겨주세요.')
+        self.search_box.setPlaceholderText('병명 검색, # 으로 총 문서 수 확인, 빈칸으로 오타검정')
         self.search_btn = QPushButton("검색")
         self.search_btn.clicked.connect(self.search)
         self.search_box.returnPressed.connect(self.search)
@@ -288,6 +291,9 @@ class SaveGUI(QtWidgets.QWidget):
             qm = QMessageBox
             qm.information(self, '동기화 완료', "동기화가 완료되었습니다.\n덮어씌워진 파일은 다음과 같습니다." + info)
 
+    def showDocCount(self, docCount):
+        qm = QMessageBox
+        qm.information(self, '총 문서 수', f"등록된 총 문서 수는 {docCount}개 입니다.")
 
 
     @QtCore.Slot()

@@ -22,6 +22,7 @@ class MongoUpdater(QObject):
     hereDBdata = Signal(list)
     nothingToUpload = Signal()
     onlineSyncData = Signal(list)
+    docCount = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -33,8 +34,8 @@ class MongoUpdater(QObject):
         try:
             self.client.admin.command('ismaster')
             # illcyclopedia for actual, _dev for dev
-            #self.db = self.client.illcyclopedia
-            self.db = self.client.illcyclopedia_dev
+            self.db = self.client.illcyclopedia
+            #self.db = self.client.illcyclopedia_dev
             # if collection diseases does not exist
             if "diseases" in self.db.list_collection_names():
                 # if diseases collections exist, but it doesn't have search index
@@ -55,6 +56,9 @@ class MongoUpdater(QObject):
 
     def search(self, searchQuery):
         results = list(self.db.diseases.find({}))
+        if searchQuery == '#':
+            self.docCount.emit(len(results))
+            return
         detail = []
         debugs = []
         isbug = False
