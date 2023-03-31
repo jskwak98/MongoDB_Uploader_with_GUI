@@ -19,9 +19,7 @@ class SaveGUI(QtWidgets.QWidget):
 
     def __init__(self):
         super().__init__()
-        with open("title.txt", "r", encoding = 'UTF-8') as f:
-            title = f.readline()
-            print(title)
+        title = "질병백서 DB 관리 프로그램"
         self.setWindowTitle(title)
 
         self.turned_on = False
