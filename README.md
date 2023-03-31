@@ -1,6 +1,6 @@
 # Automated MongoDB Uploader with GUI
 
-##화면 구성과 주요 기능
+## 화면 구성과 주요 기능
 
 ![GUI](https://user-images.githubusercontent.com/47588410/229041766-7aba9c53-aa1d-47bb-a7d5-6a500bfdb39a.png)
 
